@@ -358,9 +358,15 @@ def super_removeDuplicateAudio_And_renameAllMedia():
                             send2trash(os.path.join(folderPath, fileName))
 #the super function ends
 
+def getDbSize():
+    dbSize = os.path.getsize(r"E:\Code\Laptop Code\YT-DLP CLI by Me\Database\Log of Commands by the User.csv")
+    if dbSize > 50000000:
+        print("The past-logs' size is over 50 mb.\n")
+
 #main function
 if __name__ == "__main__":
     #opening the program
+    getDbSize()
     print(f"{TEXT_DIM}(Note: Do not download the same URL as 1080p and 720p at the same time. Do not set audio file names beginning with 'NEW_M4A_'.){TEXT_RESET}")
     os.chdir(r"D:\YouTube")
     os.makedirs(r"D:\YouTube\Thumbnails", exist_ok=True)
