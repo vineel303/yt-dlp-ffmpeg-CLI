@@ -1,0 +1,1 @@
+lastThumbnail = "https://img.youtube.com/vi/2GM3X-GBt5E/maxresdefault.jpg"

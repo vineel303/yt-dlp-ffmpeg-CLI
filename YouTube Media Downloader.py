@@ -1,4 +1,6 @@
-#importing libraries
+#importing custom libraries
+import Thumbnail # print(Thumbnail.lastThumbnail)
+#importing default libraries
 import os
 from pytube import YouTube
 import re
@@ -7,6 +9,7 @@ import time
 import subprocess
 from send2trash import send2trash
 import pandas
+from deep_translator import GoogleTranslator
 
 #system constants, simple
 TEXT_RESET = "\033[0m"
@@ -17,6 +20,7 @@ TEXT_BLUE = "\033[34m"
 TEXT_BOLD = "\033[1m"
 TEXT_DIM = "\033[2m"
 TEXT_MAGENTA = "\033[35m"
+TEXT_CYAN = "\033[36m"
 
 #system constants, compound
 TEXT_CUSTOM_1 = TEXT_YELLOW + TEXT_BOLD + "|" + TEXT_RESET
@@ -27,6 +31,10 @@ main_oldFileName = []
 main_newFileName = []
 main_fileFormatList = []
 current_fileFormat = 0
+sub_TLedFileName = []
+
+#objects
+translatorObject = GoogleTranslator(source='auto', target='en')
 
 #functions
 def addYoutubeUrls():
@@ -34,6 +42,7 @@ def addYoutubeUrls():
     global main_fileFormatList
     global main_urlList
     global main_oldFileName
+    global sub_TLedFileName
     
     while True:
 
@@ -69,6 +78,8 @@ def addYoutubeUrls():
             youtubeObject = YouTube(urlElement)
             originalFileNameElement = youtubeObject.title
             print("\nOriginal title: " + TEXT_BOLD + TEXT_BLUE + originalFileNameElement + TEXT_RESET)
+            translatedText = translatorObject.translate(originalFileNameElement)
+            print(f"TLed title: {TEXT_CYAN}{translatedText}{TEXT_RESET}")
         except Exception:
             if checkInternetConnection():
                 print(f"The URL might be incorrect. {TEXT_RED}Please recheck and retry.{TEXT_RESET}")            
@@ -77,19 +88,22 @@ def addYoutubeUrls():
         main_urlList.append(urlElement)
         main_oldFileName.append(originalFileNameElement)
         main_fileFormatList.append(current_fileFormat)
-        setNewFileName(originalFileNameElement)
+        sub_TLedFileName.append(translatedText)
+        setNewFileName(originalFileNameElement, translatedText)
 
     confirmTable()
 
-def setNewFileName(originalTitle):
+def setNewFileName(originalTitle, TLedTitle):
     global main_newFileName
 
-    print(f"\n{TEXT_DIM}Pass an empty string to keep the default title.{TEXT_RESET}")
+    print(f"\n{TEXT_DIM}Enter: Default title | 0: TLed title{TEXT_RESET}")
     print(f"New Title: {TEXT_BOLD}{TEXT_BLUE}", end="")
     newFileNameElement = input()
     print(f"{TEXT_RESET}", end="")
     if not newFileNameElement:
         newFileNameElement = originalTitle
+    if newFileNameElement == "0":
+        newFileNameElement = TLedTitle
     if not isValidFileName_forWindows(newFileNameElement):
         setNewFileName(originalTitle)
     else:
@@ -203,22 +217,39 @@ def hyper_downloadAudio(url):
         subprocess.run(commandToDownloadAudio, check=True)
     except subprocess.CalledProcessError:
         whileWaitingForInternet()
+        print(f"{TEXT_RED}Attempting to resolve error:{TEXT_RESET} downloading audio.")
         hyper_downloadAudio(url)
-    hyper_downloadThumbnail(url)
+    hyper_downloadThumbnail(url, 1)
 
-def hyper_downloadThumbnail(url):
+def hyper_downloadThumbnail(url, count):
     urlElement = url[32:43]
-    newUrl = f'https://img.youtube.com/vi/{urlElement}/maxresdefault.jpg'
+    
+    if count == 1:
+        newUrl = f'https://img.youtube.com/vi/{urlElement}/maxresdefault.jpg'
+    elif count == 2:
+        newUrl = f'https://img.youtube.com/vi/{urlElement}/hddefault.jpg'
+    elif count == 3:
+        newUrl = f'https://img.youtube.com/vi/{urlElement}/sddefault.jpg'
+    elif count == 4:
+        newUrl = f'https://img.youtube.com/vi/{urlElement}/hqdefault.jpg'
+    elif count == 5:
+        newUrl = f'https://img.youtube.com/vi/{urlElement}/mqdefault.jpg'
+    elif count == 6:
+        newUrl = f'https://img.youtube.com/vi/{urlElement}/default.jpg'
+    else:
+        newUrl = Thumbnail.lastThumbnail
+    
     newUrlResponse = requests.get(newUrl, stream=True)
     
+    imagePath = "D:\\YouTube\\Thumbnails\\" + urlElement + ".jpg"
     if newUrlResponse.status_code == 200:
-        imagePath = "D:\\YouTube\\Thumbnails\\" + urlElement + ".jpg"
         with open(imagePath, "wb") as imageFile:
             for imageChunk in newUrlResponse.iter_content(chunk_size=8192):
                 imageFile.write(imageChunk)
     else:
         whileWaitingForInternet()
-        hyper_downloadThumbnail(url)
+        print(f"{TEXT_RED}Attempting to resolve error:{TEXT_RESET} downloading thumbnail.")
+        hyper_downloadThumbnail(url, count+1)
     
     hyper_combineAudioAndThumbnail(url, urlElement, imagePath)
 
@@ -250,6 +281,7 @@ def hyper_combineAudioAndThumbnail(url, urlElement, imagePath):
         ]
         subprocess.run(command, check=True)
     except subprocess.CalledProcessError:
+        print(f"{TEXT_RED}Attempting to resolve error:{TEXT_RESET} merging audio and thumbnail.")
         hyper_combineAudioAndThumbnail(url, urlElement, imagePath)
 
 def whileWaitingForInternet():
@@ -274,6 +306,7 @@ def downloadVideo(url, quality):
         subprocess.run(command, check=True)
     except subprocess.CalledProcessError:
         whileWaitingForInternet()
+        print(f"{TEXT_RED}Attempting to resolve error:{TEXT_RESET} downloading video.")
         downloadVideo(url, quality)    
 
 def checkInternetConnection():
@@ -293,11 +326,12 @@ def sendAllDataToCsv():
     global main_newFileName
     global main_oldFileName
     global main_urlList
+    global sub_TLedFileName
     fullFileFormatName = ["Audio", "Video 1080p", "Video 720p"]
     for element in range(len(main_urlList)):
-        dataToAppend = [{"URL":main_urlList[element], "Original Name":main_oldFileName[element], "New Name":main_newFileName[element], "File Type":fullFileFormatName[main_fileFormatList[element]]}]
+        dataToAppend = [{"URL":main_urlList[element], "Original Name":main_oldFileName[element], "TLed Name":sub_TLedFileName[element], "New Name":main_newFileName[element], "File Type":fullFileFormatName[main_fileFormatList[element]]}]
         dataToAppend_dataFrame = pandas.DataFrame(dataToAppend)
-        dataToAppend_dataFrame.to_csv(r"E:\Code\Laptop Code\YT-DLP CLI by Me\Database\Log of Commands by the User.csv", mode="a", index=False, header=False, encoding='utf-8')
+        dataToAppend_dataFrame.to_csv(r"E:\Code\Laptop Code\YT-DLP CLI by Me\Database\Log of Commands by the User.csv", mode="a", index=False, header=False, encoding='utf-8-sig')
 
 #the super function starts
 def super_removeDuplicateAudio_And_renameAllMedia():
